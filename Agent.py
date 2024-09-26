@@ -8,42 +8,54 @@ class Agent:
         pass
 
     def Solve(self, problem):
-
-        #This code only applies the horizontal transformation
+        #This code does both horizontal and verticla transforms
         figures = self.load_and_preprocess_images(problem)
 
         if problem.problemType == '2x2':
-            #Training pairs to learn
-            training_pairs = [('A', 'B'), ('A', 'C')]
-            #unknown = 'D'
+            # Training pairs to learn
+            training_pairs = {
+                'horizontal': ('A', 'B'),
+                'vertical': ('A', 'C')
+            }
+            # unknown = 'D'
             answer_choices = [str(i) for i in range(1, 7)]
-            training_transformations = []
+            training_transformations = {}
 
             # Assess the transformations 
-            for pair in training_pairs:
+            for relation, pair in training_pairs.items():
                 image1 = figures[pair[0]]
                 image2 = figures[pair[1]]
                 transformations = self.Calculate_Transformations(image1, image2)
-                training_transformations.append(transformations)
+                training_transformations[relation] = transformations
 
-            # Initialize similarity scores
+
             similarity_scores = {answer: 0 for answer in answer_choices}
 
-            # Compute transformations between 'C' and each answer choice
+            # Compute transformations horizontall and vertically
             for answer in answer_choices:
                 answer_image = figures[answer]
-                transformations = self.Calculate_Transformations(figures['C'], answer_image)
-                total_similarity = 0
-                for train_transformation in training_transformations:
-                    similarity = self.Compare_Transformations(train_transformation, transformations)
-                    total_similarity += similarity
+
+                # Horizontal comparison 
+                transformations_horizontal = self.Calculate_Transformations(figures['C'], answer_image)
+                similarity_horizontal = 0
+                similarity_horizontal = self.Compare_Transformations(
+                    training_transformations['horizontal'], transformations_horizontal)
+
+                # Vertical comparison 
+                transformations_vertical = self.Calculate_Transformations(figures['B'], answer_image)
+                similarity_vertical = 0
+                similarity_vertical = self.Compare_Transformations(
+                    training_transformations['vertical'], transformations_vertical)
+
+                # Sum both
+                total_similarity = similarity_horizontal + similarity_vertical
                 similarity_scores[answer] = total_similarity
 
             # Choose the answer with the highest similarity score
             best_answer = max(similarity_scores, key=similarity_scores.get)
             return int(best_answer)
-        
-        #Skip any non 2 by 2
+
+        #Skip any non 2 by 2 
         else:
             return -1
 
@@ -59,13 +71,12 @@ class Agent:
         extra, image = cv2.threshold(image, 127, 255, cv2.THRESH_BINARY) #Using threshold values from opencv documentation: https://docs.opencv.org/4.x/d7/d4d/tutorial_py_thresholding.html 
         return image
 
-    #Try various rotations and flips that could show up in a Ravens problem
     def Calculate_Transformations(self, image1, image2):
         transformations = []
         rotation_angles = [0, 90, 180, 270]
         flip_modes = [None, 'horizontal', 'vertical']
 
-        
+        # Try combinations of rotations and flips
         for angle in rotation_angles:
             rotated_image = self.Rotate_Image(image1, angle)
             for flip in flip_modes:
@@ -115,10 +126,8 @@ class Agent:
         denominator = (mu1**2 + mu2**2 + C1) * (sigma1_sq + sigma2_sq + C2)
         ssim = numerator / denominator
         return ssim
-
     #End of code from CV Notes
-    
-    #Keep track of the highest SSIM
+
     def Compare_Transformations(self, transformations1, transformations2):
         max_similarity = 0
         for trans1 in transformations1:
